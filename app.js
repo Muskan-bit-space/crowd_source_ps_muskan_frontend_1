@@ -3,12 +3,54 @@ const express=require('express');
 const app = express();
 const dotenv=require('dotenv');
 dotenv.config();
+
+const session = require('express-session');
+// const MongoStore = require('connect-mongo');
+const {MongoStore} = require('connect-mongo');
+const User=require('./models/User')
+const {user_entry_lookup_on_login}=require('./handlers/find_user_on_login_in_user_table')
+
 const PORT = process.env.PORT;
 
 // Configuration from Google Cloud Console
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID';
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'YOUR_CLIENT_SECRET';
 const REDIRECT_URI = `http://localhost:${PORT}/oauth/callback`;
+
+//////// app.use thingies-------------------------------------------------------------------
+
+app.use(
+    session({
+        secret: process.env.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        store: MongoStore.create({
+            mongoUrl: process.env.MONGO_URI
+        }),
+        cookie: {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+            maxAge: 1000 * 60 * 60 * 24 * 7
+        }
+    })
+);
+
+//----------------------------------------------------------------------------------------------------------------------
+
+
+///-------mongoose defn and connection logic
+const mongoose = require('mongoose');
+
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.log(err));
+
+
+//----------------------------------------------------------------------------------------------------------------------
+
+
+
 
 // Step 1 & 2: Redirect user to Google's OAuth 2.0 endpoint
 app.get('/login', (req, res) => {
@@ -26,11 +68,9 @@ app.get('/login', (req, res) => {
 // Step 3 & 4: Receive authorization code & exchange it for tokens
 app.get('/oauth/callback', async (req, res) => {
   const { code } = req.query;
-
   if (!code) {
     return res.status(400).send('Error: Authorization code not provided.');
   }
-
   try {
     // Exchange the code for Access Token and Refresh Token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -46,18 +86,17 @@ app.get('/oauth/callback', async (req, res) => {
     });
 
     const tokens = await tokenResponse.json();
-
     if (!tokenResponse.ok) {
       return res.status(tokenResponse.status).json(tokens);
     }
+
+
 
     // Step 6: Use access_token to request user profile from Google Resource Server
     const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
-
     const userData = await userResponse.json();
-
     res.json({
       message: 'Successfully authenticated!',
       tokens: {
@@ -67,10 +106,29 @@ app.get('/oauth/callback', async (req, res) => {
       },
       user: userData,
     });
+
+
+
+    //updated step 5
+      user_entry_lookup_on_login(userData);
+
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+
+
+
 });
+
+
+app.get('/', (req,res)=>{
+  console.log("on root")
+  res.send("on root")
+})
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

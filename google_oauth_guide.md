@@ -164,6 +164,8 @@ const PORT = process.env.PORT;
 
 **2. Endpoint 1: `/login` (Authorization Initiator)**
 
+![alt text](image-4.png)
+
 When a user opens `http://localhost:PORT/login` in their browser, this route triggers step 1 of the OAuth flow.
 
 ```javascript
@@ -227,3 +229,21 @@ app.listen(PORT, () => { ... });
 ```
 
 Binds the Express server to your designated port and logs startup messages to the console.
+
+
+
+----
+now the learning from the auth things happening...
+
+1.i am asking google to identify the user
+
+2.then google is giving single time use code 
+
+3.i am using that code to get access and refresh tokens
+
+4.then i am accessing the user info on the userinfo endpoint
+from oauth 
+
+5.then i am using that data in order to populate my database 
+with the user info if the user with that google id
+does not exist
